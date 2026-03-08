@@ -13,3 +13,5 @@ psutil
 pynput
 opencv-python
 numpy
+torch
+transformers
