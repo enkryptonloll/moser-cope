@@ -1,0 +1,15 @@
+requests
+colorama
+beautifulsoup4
+dnspython
+phonenumbers
+python-whois
+paramiko
+scapy
+cryptography
+pillow
+pyautogui
+psutil
+pynput
+opencv-python
+numpy
