@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-
+#Creds to shsbaaid on tg
 import os
 import sys
 import base64
